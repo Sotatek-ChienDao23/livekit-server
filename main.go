@@ -11,14 +11,29 @@ import (
 	lksdk "github.com/livekit/server-sdk-go/v2"
 )
 
+type UpdateParticipant struct {
+	Room              string                `json:"room"`
+	Identity          string                `json:"identity"`
+	CanSubscribe      bool                  `json:"can_subscribe"`
+	CanPublish        bool                  `json:"can_publish"`
+	CanPublishData    bool                  `json:"can_publish_data"`
+	CanPublishSources []livekit.TrackSource `json:"can_publish_sources"`
+}
+
+type ConnectToRoom struct {
+	Room     string `json:"room"`
+	Identity int    `json:"identity"`
+	Token    string `json:"token"`
+}
+
 func main() {
 	apiKey := os.Getenv("LIVEKIT_API_KEY")
 	apiSecret := os.Getenv("LIVEKIT_API_SECRET")
 	host := os.Getenv("LIVEKIT_API_HOST")
 
 	roomService := lksdk.NewRoomServiceClient(host, apiKey, apiSecret)
-	router := gin.Default()
 
+	router := gin.Default()
 	router.POST("/create-room", func(c *gin.Context) {
 		roomName := c.Query("roomName")
 		if roomName == "" {
@@ -35,7 +50,7 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"room": room})
 	})
 
-	router.POST("/join-room", func(c *gin.Context) {
+	router.POST("/join-token", func(c *gin.Context) {
 		roomName := c.Query("roomName")
 		identity := c.Query("identity")
 		if roomName == "" || identity == "" {
@@ -56,6 +71,22 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"token": token})
 	})
 
+	router.POST("/join-room", func(c *gin.Context) {
+		var req *ConnectToRoom
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		room, err := lksdk.ConnectToRoomWithToken(host, req.Token, &lksdk.RoomCallback{})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"room": room})
+	})
+
 	router.GET("/list-rooms", func(c *gin.Context) {
 		rooms, err := roomService.ListRooms(c.Request.Context(), &livekit.ListRoomsRequest{})
 		if err != nil {
@@ -66,6 +97,26 @@ func main() {
 		c.JSON(http.StatusOK, rooms.Rooms)
 	})
 
+	router.GET("/room", func(c *gin.Context) {
+		roomName := c.Query("roomName")
+		if roomName == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "roomName is required"})
+			return
+		}
+
+		room, err := roomService.ListRooms(c.Request.Context(), &livekit.ListRoomsRequest{
+			Names: []string{roomName},
+		})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"room": room.Rooms,
+		})
+	})
+
 	router.GET("/list-participants", func(c *gin.Context) {
 		roomName := c.Query("roomName")
 		if roomName == "" {
@@ -73,7 +124,9 @@ func main() {
 			return
 		}
 
-		participants, err := roomService.ListParticipants(c.Request.Context(), &livekit.ListParticipantsRequest{Room: roomName})
+		participants, err := roomService.ListParticipants(c.Request.Context(), &livekit.ListParticipantsRequest{
+			Room: roomName,
+		})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -156,6 +209,34 @@ func main() {
 		}
 
 		c.JSON(http.StatusOK, gin.H{"message": "Participant unmuted successfully"})
+	})
+
+	router.PUT("/update-participant", func(c *gin.Context) {
+		var req *UpdateParticipant
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		res, err := roomService.UpdateParticipant(c.Request.Context(), &livekit.UpdateParticipantRequest{
+			Room:     req.Room,
+			Identity: req.Identity,
+			Permission: &livekit.ParticipantPermission{
+				CanSubscribe:      req.CanSubscribe,
+				CanPublish:        req.CanPublish,
+				CanPublishData:    req.CanPublishData,
+				CanPublishSources: req.CanPublishSources,
+			},
+		})
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"result": res,
+		})
 	})
 
 	log.Println("Starting server on :8000")
