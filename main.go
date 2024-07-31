@@ -4,12 +4,18 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/livekit/protocol/auth"
 	"github.com/livekit/protocol/livekit"
 	lksdk "github.com/livekit/server-sdk-go/v2"
 )
+
+type CreateRoom struct {
+	Room string `json:"room"`
+}
 
 type UpdateParticipant struct {
 	Room              string                `json:"room"`
@@ -22,8 +28,13 @@ type UpdateParticipant struct {
 
 type ConnectToRoom struct {
 	Room     string `json:"room"`
-	Identity int    `json:"identity"`
+	Identity string `json:"identity"`
 	Token    string `json:"token"`
+}
+
+type HandleParticipant struct {
+	Room     string `json:"room"`
+	Identity string `json:"identity"`
 }
 
 func main() {
@@ -34,14 +45,27 @@ func main() {
 	roomService := lksdk.NewRoomServiceClient(host, apiKey, apiSecret)
 
 	router := gin.Default()
+
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
+		AllowHeaders:     []string{"*"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
+
 	router.POST("/create-room", func(c *gin.Context) {
-		roomName := c.Query("roomName")
-		if roomName == "" {
+		var req *CreateRoom
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if req.Room == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "roomName is required"})
 			return
 		}
 
-		room, err := roomService.CreateRoom(c.Request.Context(), &livekit.CreateRoomRequest{Name: roomName})
+		room, err := roomService.CreateRoom(c.Request.Context(), &livekit.CreateRoomRequest{Name: req.Room})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -50,7 +74,7 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"room": room})
 	})
 
-	router.POST("/join-token", func(c *gin.Context) {
+	router.GET("/join-token", func(c *gin.Context) {
 		roomName := c.Query("roomName")
 		identity := c.Query("identity")
 		if roomName == "" || identity == "" {
@@ -112,8 +136,15 @@ func main() {
 			return
 		}
 
+		if room == nil {
+			c.JSON(http.StatusOK, gin.H{
+				"room": nil,
+			})
+			return
+		}
+
 		c.JSON(http.StatusOK, gin.H{
-			"room": room.Rooms,
+			"room": room.Rooms[0],
 		})
 	})
 
@@ -161,14 +192,18 @@ func main() {
 	})
 
 	router.POST("/remove-participant", func(c *gin.Context) {
-		roomName := c.Query("roomName")
-		identity := c.Query("identity")
-		if roomName == "" || identity == "" {
+		var req *HandleParticipant
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		if req.Room == "" || req.Identity == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "roomName and identity are required"})
 			return
 		}
 
-		_, err := roomService.RemoveParticipant(c.Request.Context(), &livekit.RoomParticipantIdentity{Room: roomName, Identity: identity})
+		_, err := roomService.RemoveParticipant(c.Request.Context(), &livekit.RoomParticipantIdentity{Room: req.Room, Identity: req.Identity})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -178,14 +213,18 @@ func main() {
 	})
 
 	router.POST("/mute-participant", func(c *gin.Context) {
-		roomName := c.Query("roomName")
-		identity := c.Query("identity")
-		if roomName == "" || identity == "" {
+		var req *HandleParticipant
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		if req.Room == "" || req.Identity == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "roomName and identity are required"})
 			return
 		}
 
-		_, err := roomService.MutePublishedTrack(c.Request.Context(), &livekit.MuteRoomTrackRequest{Room: roomName, Identity: identity, Muted: true})
+		_, err := roomService.MutePublishedTrack(c.Request.Context(), &livekit.MuteRoomTrackRequest{Room: req.Room, Identity: req.Identity, Muted: true})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -195,14 +234,18 @@ func main() {
 	})
 
 	router.POST("/unmute-participant", func(c *gin.Context) {
-		roomName := c.Query("roomName")
-		identity := c.Query("identity")
-		if roomName == "" || identity == "" {
+		var req *HandleParticipant
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		if req.Room == "" || req.Identity == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "roomName and identity are required"})
 			return
 		}
 
-		_, err := roomService.MutePublishedTrack(c.Request.Context(), &livekit.MuteRoomTrackRequest{Room: roomName, Identity: identity, Muted: false})
+		_, err := roomService.MutePublishedTrack(c.Request.Context(), &livekit.MuteRoomTrackRequest{Room: req.Room, Identity: req.Identity, Muted: false})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
