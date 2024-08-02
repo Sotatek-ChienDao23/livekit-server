@@ -1,0 +1,19 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs/:/root/logs/
+    restart: unless-stopped
+    networks:
+      - app-tier
+
+networks:
+  app-tier:
+    driver: bridge
+    name: app-tier
