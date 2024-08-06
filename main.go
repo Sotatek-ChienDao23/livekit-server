@@ -84,6 +84,7 @@ func main() {
 
 		at := auth.NewAccessToken(apiKey, apiSecret).
 			AddGrant(&auth.VideoGrant{RoomJoin: true, Room: roomName}).
+			SetValidFor(time.Hour * 3600). //time expire token
 			SetIdentity(identity)
 
 		token, err := at.ToJWT()
