@@ -1,17 +1,30 @@
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    env_file:
-      - .env
+  redis:
+    image: redis:6
     ports:
-      - "8000:8000"
-    volumes:
-      - ./logs/:/root/logs/
-    restart: unless-stopped
+      - "6379:6379/tcp"
     networks:
       - app-tier
+#  app:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    env_file:
+#      - .env
+#    ports:
+#      - "8000:8000"
+#    volumes:
+#      - ./logs/:/root/logs/
+#    restart: unless-stopped
+#    networks:
+#      - app-tier
+  livekit:
+    image: livekit/livekit-server:latest
+    command: --config /etc/livekit.yaml
+    restart: unless-stopped
+    network_mode: "host"
+    volumes:
+      - ./docker/livekit/livekit.yaml:/etc/livekit.yaml
 
 networks:
   app-tier:

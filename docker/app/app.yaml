@@ -1,0 +1,5 @@
+livekit:
+  api:
+    key: "APIcpVZzN8BHv3r"
+    secret: "Jw0jFj3XIrydfcqaT2aUegd9R9hT4gvZV11y9VQNDzV"
+  url: "http://localhost:7880"

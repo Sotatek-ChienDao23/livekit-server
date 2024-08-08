@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
+	"fmt"
+	config2 "livekit-server/config"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -38,10 +40,14 @@ type HandleParticipant struct {
 }
 
 func main() {
-	apiKey := os.Getenv("LIVEKIT_API_KEY")
-	apiSecret := os.Getenv("LIVEKIT_API_SECRET")
-	host := os.Getenv("LIVEKIT_API_HOST")
 
+	config, err := config2.LoadConfig("./docker/app")
+	if err != nil {
+		log.Fatal(err)
+	}
+	apiKey := config.LivekitConfig.Api.Key
+	apiSecret := config.LivekitConfig.Api.Secret
+	host := config.LivekitConfig.Url
 	roomService := lksdk.NewRoomServiceClient(host, apiKey, apiSecret)
 
 	router := gin.Default()
@@ -53,7 +59,11 @@ func main() {
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
-
+	rooms, err := roomService.ListRooms(context.Background(), &livekit.ListRoomsRequest{})
+	if err != nil {
+		log.Fatalf("error in list rooms %v", err)
+	}
+	fmt.Printf("room is: %v\n", rooms)
 	router.POST("/create-room", func(c *gin.Context) {
 		var req *CreateRoom
 		if err := c.ShouldBindJSON(&req); err != nil {

@@ -1,0 +1,17 @@
+port: 7880
+rtc:
+  udp_port: 7882
+  tcp_port: 7881
+  use_external_ip: false
+redis:
+  address: localhost:6379
+  username: ""
+  password: ""
+  db: 2
+keys:
+  APIcpVZzN8BHv3r: Jw0jFj3XIrydfcqaT2aUegd9R9hT4gvZV11y9VQNDzV
+logging:
+  json: false
+  level: info
+
+
